@@ -1,40 +1,48 @@
 
-
-
-//数据-> 响应式数据：拦截get、set操作
-//将一个数据变为响应式数据：
-//需要在这个数据改变时 -> 重新执行一遍所有get该数据的函数
-//就是拦截这个数据的get 和 set
-//get:凡是读取该数据的函数均放入桶内
-//set:当修改该数据时 -> 把桶内的函数都重新执行一遍。
-
-const data = {text:'hello world'};
-//get响应式数据的函数
-function effectFn(){
-    console.log(obj.text);
-    // document.body.innerText = obj.text; //范围的代理对象
-}
-//桶
+//对象data:
+const data = {text:'hello'};
 const bucket = new Set();
+
+//统计当前的副作用函数
+let activeEffect = null;
 const obj = new Proxy(data,{
-    get(target,key){
-        bucket.add(effectFn); 缺点：需要一个一个将get响应式数据的函数加入桶内？？
+    get(target,key,receiver){
+        if(affectFn){
+            bucket.add(affectFn);
+        }
         return target[key];
     },
-    set(target,key,value){
-        //重新set响应式数据时 -> 将副作用函数从桶里拿出来执行
+    set(target,key,value,receiver){
         target[key]=value;
-        bucket.forEach(fn=>fn());   【缺点2：每个get的函数都是重新执行？是仅computed/watch这种才会重新执行吧？普通函数变量不会吧？】
+        bucket.forEach((fn)=>fn());
         return true;
     }
-})
+});
 
-//测试obj是否为响应式数据？
-//先读取
-effectFn(); 
+//页面初始：先一加载 -> 执行所有副作用函数 -> 这样才能触发响应式数据的get -> 将函数加入桶内;
+//函数
+function effect1(){
+    document.body.innerText = obj.text;
+}
+function effect2(){
+    console.log(obj.text);
+}
+//需要先执行响应式数据的get -> 才能将该函数加入桶内;
+addEffect(effect1);     
+addEffect(effect2);
+//修改响应式数据
 setTimeout(()=>{
-    obj.text='测试';//当响应式数据改变时 -> 测试get该响应式数据的函数是否自动重新执行了。
+    obj.text();
+    //会发现effect1和effect2的内容被更新了
 },1000);
+
+
+//1.因为同一时间只会执行一个函数 -> 遍历的依次加入桶内
+//优化：
+function addEffect(fn){
+    activeEffect = fn;
+    fn();
+}
 
 
 
